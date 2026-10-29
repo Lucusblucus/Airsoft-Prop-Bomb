@@ -7,6 +7,14 @@
 
 
 #define BOMB_TIME 30 //In seconds
+#define VOLUME 10 //Between 0-30
+
+enum AudioFiles { //Audio Files
+  Beep = 1,
+  Planted,
+  Explode,
+  Defuse
+};
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -32,6 +40,8 @@ State currentState = DISARMED;
 
 const int buzzerPin = 3;
 
+unsigned long lastBeepAt = 0;
+
 String inputBuffer = "";
 unsigned long armedAt = 0;
 unsigned long lastDisplayUpdate = 0;
@@ -47,7 +57,7 @@ void setup() {
     lcd.print("DFPlayer error");
     while (true); 
   }
-  myDFPlayer.volume(5); // 0-30
+  myDFPlayer.volume(VOLUME);
 
   setDisarmedState();
 }
@@ -61,7 +71,8 @@ void loop() {
 
   if (currentState == ARMED) {
     updateCountdown();
-  }
+    updateBeep();
+  } 
 }
 
 void handleKeyPress(char key) {
@@ -89,8 +100,16 @@ void handleKeyPress(char key) {
 void checkCode() {
   if (inputBuffer.equals(masterCode)) {
     if (currentState == DISARMED) {
+      myDFPlayer.stop();
+      myDFPlayer.play(Planted);
+      delay(2000);
       setArmedState();
+
     } else if (currentState == ARMED) {
+      myDFPlayer.stop();
+      myDFPlayer.play(Defuse);
+      delay(2000);
+      myDFPlayer.stop();
       setDisarmedState();
     }
   } else {
@@ -114,7 +133,8 @@ void setArmedState() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("BOMB ARMED");
-  myDFPlayer.loop(1); 
+  myDFPlayer.stop();
+  lastBeepAt = 0; 
 }
 
 void setDisarmedState() {
@@ -129,12 +149,15 @@ void setDisarmedState() {
 void setExplodedState() {
   currentState = EXPLODED;
   myDFPlayer.stop(); 
-  myDFPlayer.play(2); 
+  myDFPlayer.play(Explode); 
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("BOOM!");
   lcd.setCursor(0, 1);
   lcd.print("BOMB EXPLODED");
+
+  delay(4000);
+  myDFPlayer.stop(); 
 }
 
 void updateCountdown() {
@@ -155,6 +178,20 @@ void updateCountdown() {
     lcd.print(remaining);
     lcd.print("s   "); // trailing spaces clear leftover digits
     showEntryScreen();
+  }
+}
+
+void updateBeep() {
+  unsigned long elapsed = millis() - armedAt;
+  if (elapsed >= bombTime) return;
+  unsigned long remaining = bombTime - elapsed;
+
+  // 1 beep/sec until the last 12s, then speeds up, floor of 150ms
+  unsigned long interval = constrain(remaining / 12, 150, 1000);
+
+  if (millis() - lastBeepAt >= interval) {
+    lastBeepAt = millis();
+    myDFPlayer.play(Beep);
   }
 }
 

@@ -1,6 +1,10 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
+#include <Arduino.h>
+#include <SoftwareSerial.h>
+#include <DFRobotDFPlayerMini.h>
+
 
 #define BOMB_TIME 30 //In seconds
 
@@ -16,6 +20,9 @@ char keys[ROWS][COLS] = {
 byte colPins[COLS] = {2, 4, 7, 8};
 byte rowPins[ROWS] = {11, 12, A0, A1};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+SoftwareSerial mySerial(10, 9); // D10=RX, D9=TX
+DFRobotDFPlayerMini myDFPlayer;
 
 const char masterCode[5] = "1234"; 
 const unsigned long bombTime = BOMB_TIME * 1000; // in ms
@@ -33,6 +40,14 @@ void setup() {
 
   lcd.init();
   lcd.backlight();
+
+  mySerial.begin(9600);
+  if (!myDFPlayer.begin(mySerial)) {
+    lcd.setCursor(0, 0);
+    lcd.print("DFPlayer error");
+    while (true); 
+  }
+  myDFPlayer.volume(5); // 0-30
 
   setDisarmedState();
 }
@@ -99,10 +114,12 @@ void setArmedState() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("BOMB ARMED");
+  myDFPlayer.loop(1); 
 }
 
 void setDisarmedState() {
   currentState = DISARMED;
+  myDFPlayer.stop();
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("BOMB DISARMED");
@@ -111,6 +128,8 @@ void setDisarmedState() {
 
 void setExplodedState() {
   currentState = EXPLODED;
+  myDFPlayer.stop(); 
+  myDFPlayer.play(2); 
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("BOOM!");
